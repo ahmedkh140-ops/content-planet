@@ -1,0 +1,53 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Planet | مركز العمليات</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-teal: #258c97;
+            --brand-purple: #382654;
+            --brand-blue: #3d8ec9;
+            --brand-lime: #a2cf44;
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: var(--brand-purple);
+            color: #e2e8f0;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #2a1b3d; }
+        ::-webkit-scrollbar-thumb { background: var(--brand-teal); border-radius: 10px; }
+        .glass {
+            background: rgba(42, 27, 61, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .bg-brand-teal { background-color: var(--brand-teal); }
+        .text-brand-teal { color: var(--brand-teal); }
+        .bg-brand-lime { background-color: var(--brand-lime); }
+        .text-brand-lime { color: var(--brand-lime); }
+        .bg-brand-blue { background-color: var(--brand-blue); }
+        .text-brand-blue { color: var(--brand-blue); }
+        .border-brand-teal { border-color: var(--brand-teal); }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0"
+  }
+}
+</script>
+</head>
+<body class="min-h-screen overflow-x-hidden">
+    <div id="root"></div>
+</body>
+</html>

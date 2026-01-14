@@ -20,7 +20,10 @@ import {
   Calendar,
   XCircle,
   Clock,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Activity,
+  Zap,
+  Filter
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -30,7 +33,10 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  Legend
+  Legend,
+  LineChart,
+  Line,
+  Cell
 } from 'recharts';
 import { User, Course, Sale, AdCampaign, ViewType, SubViewType, Round, PaymentMethod, Gender } from './types';
 import { DEFAULT_COURSES, PLATFORMS, GOVERNORATES, PAYMENT_METHODS } from './constants';
@@ -97,24 +103,53 @@ const App: React.FC = () => {
     }
   };
 
-  const financialData = useMemo(() => {
+  // --- ENHANCED FINANCIAL AUDIT CALCULATIONS ---
+  const auditData = useMemo(() => {
     const filteredSales = sales.filter(s => 
       s.status !== 'withdrawn' &&
       s.date >= filters.start && s.date <= filters.end && 
       (filters.platform === 'All' || s.platform === filters.platform)
     );
     const filteredAds = ads.filter(a => a.date >= filters.start && a.date <= filters.end);
+
     const metrics = courses.map(c => {
       const cSales = filteredSales.filter(s => s.courseId === c.id);
       const cAds = filteredAds.filter(a => a.courseId === c.id);
+      
       const rev = cSales.reduce((sum, s) => sum + s.finalPrice, 0);
       const spend = cAds.reduce((sum, a) => sum + a.spend, 0);
+      const leads = cAds.reduce((sum, a) => sum + a.leads, 0);
+      const salesCount = cSales.length;
+
       return {
-        id: c.id, name: c.name, revenue: rev, spend: spend, profit: rev - spend,
-        roas: spend > 0 ? (rev / spend).toFixed(1) : '0'
+        id: c.id,
+        name: c.name,
+        revenue: rev,
+        spend: spend,
+        leads: leads,
+        salesCount: salesCount,
+        profit: rev - spend,
+        roas: spend > 0 ? (rev / spend).toFixed(2) : '0.00',
+        cpl: leads > 0 ? (spend / leads).toFixed(2) : '0.00',
+        conversion: leads > 0 ? ((salesCount / leads) * 100).toFixed(1) : '0.0'
       };
     });
-    return { metrics, totalRevenue: metrics.reduce((s, x) => s + x.revenue, 0), totalSpend: metrics.reduce((s, x) => s + x.spend, 0) };
+
+    const totalRevenue = metrics.reduce((s, x) => s + x.revenue, 0);
+    const totalSpend = metrics.reduce((s, x) => s + x.spend, 0);
+    const totalLeads = metrics.reduce((s, x) => s + x.leads, 0);
+    const totalSales = metrics.reduce((s, x) => s + x.salesCount, 0);
+
+    return { 
+      metrics, 
+      totalRevenue, 
+      totalSpend, 
+      totalLeads,
+      totalSales,
+      avgRoas: totalSpend > 0 ? (totalRevenue / totalSpend).toFixed(2) : '0.00',
+      avgCpl: totalLeads > 0 ? (totalSpend / totalLeads).toFixed(2) : '0.00',
+      overallConv: totalLeads > 0 ? ((totalSales / totalLeads) * 100).toFixed(1) : '0.0'
+    };
   }, [sales, ads, courses, filters]);
 
   const getCourseName = (id: string) => courses.find(c => c.id === id)?.name || id;
@@ -188,35 +223,34 @@ const App: React.FC = () => {
 
       {/* MAIN CONTENT */}
       <main className="flex-grow overflow-y-auto p-4 md:p-8">
-        {/* VIEW: LANDING */}
+        {/* LANDING */}
         {activeView === 'landing' && (
           <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
             <div className="glass p-12 rounded-[2.5rem] text-center space-y-6">
               <h2 className="text-4xl font-black text-white">أهلاً بك في نظام <span className="text-brand-lime">Content Planet</span></h2>
-              <p className="text-slate-400 text-lg">التحكم المتكامل في المبيعات، الحملات، وإدارة الراوندات.</p>
+              <p className="text-slate-400 text-lg">التحكم المتكامل في المبيعات، الحملات، والتدقيق المالي.</p>
               <div className="flex flex-wrap justify-center gap-4">
                 <button onClick={() => setActiveView('moderation')} className="bg-brand-teal hover:bg-[#207a84] text-white font-bold py-4 px-10 rounded-2xl shadow-xl transition-all flex items-center gap-2">
                   <Plus /> تسجيل عميل جديد
                 </button>
-                <button onClick={() => setActiveView('rounds')} className="bg-white/5 hover:bg-white/10 text-white font-bold py-4 px-10 rounded-2xl border border-white/10 transition-all">
-                  إدارة مواعيد الكورسات
+                <button onClick={() => setActiveView('financial')} className="bg-brand-lime text-brand-purple hover:scale-105 transition-all font-bold py-4 px-10 rounded-2xl shadow-xl flex items-center gap-2">
+                  <Activity size={18}/> معاينة جودة الحملات
                 </button>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <DashboardCard icon={<Clock className="text-brand-blue"/>} title="مواعيد الكورسات" desc="تحديد الراوندات القادمة" onClick={() => setActiveView('rounds')} />
+              <DashboardCard icon={<Target className="text-brand-blue"/>} title="Meta Audit" desc="تحليل الحملات المستوردة" onClick={() => setActiveView('meta')} />
               <DashboardCard icon={<Users className="text-brand-teal"/>} title="إدارة العملاء" desc="المبيعات، التحصيل، والسحب" onClick={() => setActiveView('moderation')} />
-              <DashboardCard icon={<BarChart3 className="text-brand-lime"/>} title="التحليل المالي" desc="مراقبة ROAS والأرباح" onClick={() => setActiveView('financial')} />
+              <DashboardCard icon={<BarChart3 className="text-brand-lime"/>} title="التحليل المالي" desc="مراقبة ROAS وتكلفة الليد" onClick={() => setActiveView('financial')} />
             </div>
           </div>
         )}
 
-        {/* VIEW: SETTINGS (COURSES) */}
+        {/* SETTINGS */}
         {activeView === 'settings' && (
           <div className="max-w-4xl mx-auto space-y-6">
             <h2 className="text-3xl font-bold text-white flex items-center gap-3"><Settings className="text-brand-teal"/> إعدادات الكورسات</h2>
             <div className="glass p-6 rounded-3xl space-y-6">
-              <h3 className="font-bold flex items-center gap-2">إضافة كورس جديد</h3>
               <form onSubmit={(e) => {
                 e.preventDefault();
                 const form = e.currentTarget;
@@ -228,14 +262,14 @@ const App: React.FC = () => {
                 }
               }} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div className="md:col-span-1">
-                  <label className="text-xs text-slate-500 mb-1 block">اسم الكورس</label>
-                  <input name="name" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl" required />
+                  <label className="text-xs text-slate-500 mb-1 block font-bold">اسم الكورس</label>
+                  <input name="name" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none" required />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500 mb-1 block">السعر</label>
-                  <input name="price" type="number" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl" required />
+                  <label className="text-xs text-slate-500 mb-1 block font-bold">السعر الافتراضي</label>
+                  <input name="price" type="number" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none" required />
                 </div>
-                <button type="submit" className="bg-brand-teal text-white font-bold py-3 rounded-xl">إضافة</button>
+                <button type="submit" className="bg-brand-teal text-white font-bold py-3 rounded-xl hover:bg-[#207a84] transition-all">إضافة كورس</button>
               </form>
             </div>
             <div className="glass rounded-3xl overflow-hidden">
@@ -245,11 +279,11 @@ const App: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {courses.map(c => (
-                      <tr key={c.id}>
+                      <tr key={c.id} className="hover:bg-white/5 transition-colors">
                         <td className="p-4 font-bold">{c.name}</td>
-                        <td className="p-4">{c.price} ج.م</td>
+                        <td className="p-4 text-brand-teal font-black">{c.price} ج.م</td>
                         <td className="p-4">
-                          <button onClick={() => setCourses(courses.filter(x => x.id !== c.id))} className="text-rose-400 hover:bg-rose-400/10 p-2 rounded-lg transition-all"><Trash2 size={18}/></button>
+                          <button onClick={() => { if(confirm('حذف الكورس سيؤدي لمشاكل في السجلات القديمة، هل أنت متأكد؟')) setCourses(courses.filter(x => x.id !== c.id)); }} className="text-rose-400 hover:bg-rose-400/10 p-2 rounded-lg transition-all"><Trash2 size={18}/></button>
                         </td>
                       </tr>
                     ))}
@@ -259,7 +293,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* VIEW: ROUNDS */}
+        {/* ROUNDS */}
         {activeView === 'rounds' && (
           <div className="max-w-4xl mx-auto space-y-6">
             <h2 className="text-3xl font-bold text-white flex items-center gap-3"><Clock className="text-brand-blue"/> إدارة مواعيد الراوندات</h2>
@@ -277,19 +311,19 @@ const App: React.FC = () => {
               }} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
                   <label className="text-xs text-slate-500 mb-1 block">الكورس</label>
-                  <select name="cid" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none">
+                  <select name="cid" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none text-sm">
                     {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div className="md:col-span-1">
                   <label className="text-xs text-slate-500 mb-1 block">اسم الراوند</label>
-                  <input name="rname" placeholder="راوند أكتوبر" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none" required />
+                  <input name="rname" placeholder="راوند أكتوبر" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none text-sm" required />
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 mb-1 block">تاريخ البداية</label>
-                  <input name="rdate" type="date" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none" required />
+                  <input name="rdate" type="date" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none text-sm" required />
                 </div>
-                <button type="submit" className="bg-brand-blue text-white font-bold py-3 rounded-xl">إضافة الراوند</button>
+                <button type="submit" className="bg-brand-blue text-white font-bold py-3 rounded-xl hover:scale-105 transition-all">إضافة</button>
               </form>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -300,7 +334,7 @@ const App: React.FC = () => {
                     {c.rounds.map(r => (
                       <div key={r.id} className="bg-white/5 p-3 rounded-xl flex justify-between items-center text-xs">
                         <div>
-                          <p className="font-bold">{r.name}</p>
+                          <p className="font-bold text-white">{r.name}</p>
                           <p className="text-slate-500 italic">{r.startDate}</p>
                         </div>
                         <button onClick={() => {
@@ -308,7 +342,7 @@ const App: React.FC = () => {
                         }} className="text-rose-400 p-2 hover:bg-rose-400/10 rounded-lg"><Trash2 size={14}/></button>
                       </div>
                     ))}
-                    {c.rounds.length === 0 && <p className="text-slate-600 text-xs text-center py-4">لا توجد راوندات مسجلة.</p>}
+                    {c.rounds.length === 0 && <p className="text-slate-600 text-xs text-center py-4 italic">لا توجد مواعيد مسجلة.</p>}
                   </div>
                 </div>
               ))}
@@ -316,19 +350,18 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* VIEW: MODERATION */}
+        {/* MODERATION */}
         {activeView === 'moderation' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <h2 className="text-3xl font-bold text-white flex items-center gap-3"><Users className="text-brand-teal"/> إدارة العملاء</h2>
-              <div className="flex gap-2 bg-slate-900/50 p-1 rounded-xl">
+              <div className="flex gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-white/5">
                 <TabBtn active={activeSubView === 'new-sale'} onClick={() => setActiveSubView('new-sale')} label="تسجيل جديد" />
                 <TabBtn active={activeSubView === 'database'} onClick={() => setActiveSubView('database')} label="قاعدة البيانات" />
                 <TabBtn active={activeSubView === 'installments'} onClick={() => setActiveSubView('installments')} label="الأقساط" />
               </div>
             </div>
 
-            {/* SUB: NEW SALE */}
             {activeSubView === 'new-sale' && (
               <div className="max-w-5xl mx-auto glass p-8 rounded-[2.5rem] animate-in fade-in duration-300">
                 <form onSubmit={(e) => {
@@ -400,7 +433,7 @@ const App: React.FC = () => {
                         id="courseSelect" 
                         name="courseId" 
                         onChange={(e) => setActiveDbTab(e.target.value)} 
-                        className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none text-sm"
+                        className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none text-sm font-bold"
                       >
                         {courses.map(c => <option key={c.id} value={c.id}>{c.name} ({c.price} ج.م)</option>)}
                       </select>
@@ -409,7 +442,7 @@ const App: React.FC = () => {
                       <label className="text-[10px] font-bold text-slate-500 uppercase">الراوند (الموعد)</label>
                       <select name="roundId" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none text-sm">
                         {courses.find(c => c.id === activeDbTab)?.rounds.map(r => <option key={r.id} value={r.id}>{r.name} - {r.startDate}</option>)}
-                        {(!courses.find(c => c.id === activeDbTab)?.rounds.length) && <option value="none">لا يوجد راوندات مفعله</option>}
+                        {(!courses.find(c => c.id === activeDbTab)?.rounds.length) && <option value="none">لا توجد مواعيد متاحة</option>}
                       </select>
                     </div>
                   </div>
@@ -425,7 +458,7 @@ const App: React.FC = () => {
                     <FormGroup label="قيمة الخصم" name="discount" type="number" defaultValue="0" />
                     <FormGroup label="تاريخ استحقاق الباقي" name="dueDate" type="date" />
                   </div>
-                  <button type="submit" className="w-full bg-brand-teal py-4 rounded-2xl font-bold text-lg shadow-xl shadow-brand-teal/20 transition-all hover:scale-[1.01]">تسجيل وحفظ البيانات ✅</button>
+                  <button type="submit" className="w-full bg-brand-teal py-4 rounded-2xl font-black text-lg shadow-xl shadow-brand-teal/20 transition-all hover:scale-[1.01]">حفظ الطلب وتسجيل البيانات ✅</button>
                 </form>
               </div>
             )}
@@ -435,12 +468,12 @@ const App: React.FC = () => {
               <div className="space-y-4">
                  <div className="flex gap-2 overflow-x-auto pb-2">
                   {courses.map(c => (
-                    <button key={c.id} onClick={() => setActiveDbTab(c.id)} className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border ${activeDbTab === c.id ? 'bg-brand-teal border-brand-teal' : 'bg-slate-900 border-white/10 text-slate-500'}`}>{c.name}</button>
+                    <button key={c.id} onClick={() => setActiveDbTab(c.id)} className={`px-5 py-2.5 rounded-full text-xs font-bold whitespace-nowrap border transition-all ${activeDbTab === c.id ? 'bg-brand-teal border-brand-teal text-white shadow-lg' : 'bg-slate-900 border-white/10 text-slate-500 hover:border-white/20'}`}>{c.name}</button>
                   ))}
                 </div>
                 <div className="relative">
                   <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                  <input className="w-full bg-slate-900 border border-white/10 pr-12 p-4 rounded-2xl outline-none" placeholder="بحث بالاسم أو الهاتف..." value={dbSearch} onChange={e => setDbSearch(e.target.value)} />
+                  <input className="w-full bg-slate-900 border border-white/10 pr-12 p-4 rounded-2xl outline-none text-sm focus:ring-1 ring-brand-teal" placeholder="بحث بالاسم، الهاتف، أو المودريتور..." value={dbSearch} onChange={e => setDbSearch(e.target.value)} />
                 </div>
                 <div className="glass rounded-3xl overflow-hidden overflow-x-auto">
                    <table className="w-full text-right text-xs">
@@ -458,19 +491,19 @@ const App: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-white/5">
                         {sales
-                          .filter(s => s.status !== 'withdrawn' && s.courseId === activeDbTab && (s.client.includes(dbSearch) || s.phone.includes(dbSearch)))
+                          .filter(s => s.status !== 'withdrawn' && s.courseId === activeDbTab && (s.client.includes(dbSearch) || s.phone.includes(dbSearch) || s.moderatorName.includes(dbSearch)))
                           .map(s => (
                             <tr key={s.id} className="hover:bg-white/5 transition-colors">
                               <td className="p-4">
-                                <div className="font-bold text-white">{s.client}</div>
+                                <div className="font-bold text-white text-sm">{s.client}</div>
                                 <div className="text-[10px] text-slate-500">{s.phone}</div>
                               </td>
                               <td className="p-4 font-bold text-brand-lime">{s.moderatorName}</td>
-                              <td className="p-4 text-brand-blue">{getRoundName(s.courseId, s.roundId)}</td>
-                              <td className="p-4 uppercase font-semibold">{s.paymentMethod}</td>
+                              <td className="p-4 text-brand-blue font-bold">{getRoundName(s.courseId, s.roundId)}</td>
+                              <td className="p-4 uppercase font-black text-brand-teal">{s.paymentMethod}</td>
                               <td className="p-4">{s.governorate}</td>
-                              <td className="p-4 font-bold">{s.finalPrice}</td>
-                              <td className="p-4 text-rose-400 font-bold">{s.remainingAmount}</td>
+                              <td className="p-4 font-black">{s.finalPrice}</td>
+                              <td className="p-4 text-rose-400 font-black">{s.remainingAmount}</td>
                               <td className="p-4">
                                 {user.role === 'admin' ? (
                                   <div className="flex gap-2">
@@ -478,7 +511,7 @@ const App: React.FC = () => {
                                     <button onClick={() => { if(confirm('متأكد من حذف العميل؟')) setSales(sales.filter(x => x.id !== s.id)); }} className="p-2 bg-rose-500/10 text-rose-400 rounded-lg hover:bg-rose-500 hover:text-white transition-all"><Trash2 size={16}/></button>
                                   </div>
                                 ) : (
-                                  <span className="text-slate-600 italic">للماركتنج فقط</span>
+                                  <span className="text-slate-600 italic text-[10px]">للماركتنج فقط</span>
                                 )}
                               </td>
                             </tr>
@@ -491,15 +524,127 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* VIEW: META ADS IMPORT */}
+        {/* FINANCIAL ANALYTICS (ENHANCED) */}
+        {activeView === 'financial' && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <h2 className="text-3xl font-black text-white flex items-center gap-3"><Zap className="text-brand-lime"/> مركز التدقيق المالي وROAS</h2>
+              <div className="flex gap-3 glass p-2 rounded-2xl border-white/5 items-center">
+                 <Filter size={16} className="text-slate-500 mr-2"/>
+                 <input type="date" value={filters.start} onChange={e => setFilters({...filters, start: e.target.value})} className="bg-transparent text-xs text-white outline-none" />
+                 <span className="text-slate-600">→</span>
+                 <input type="date" value={filters.end} onChange={e => setFilters({...filters, end: e.target.value})} className="bg-transparent text-xs text-white outline-none" />
+              </div>
+            </div>
+
+            {/* High Level KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+               <AuditMetricCard label="إجمالي الإيرادات" value={`${auditData.totalRevenue} ج.م`} subValue={`${auditData.totalSales} مبيعة`} color="teal" />
+               <AuditMetricCard label="إجمالي المصروف" value={`${auditData.totalSpend} ج.م`} subValue={`${auditData.totalLeads} ليد مستورد`} color="blue" />
+               <AuditMetricCard label="متوسط ROAS" value={`${auditData.avgRoas}x`} subValue={parseFloat(auditData.avgRoas) > 3 ? "أداء ممتاز" : "يحتاج تحسين"} color="lime" />
+               <AuditMetricCard label="تكلفة الليد (CPL)" value={`${auditData.avgCpl} ج.م`} subValue={`Conversion: ${auditData.overallConv}%`} color="teal" />
+            </div>
+
+            {/* Detailed Audit Table */}
+            <div className="glass p-8 rounded-[2.5rem] border-white/5 space-y-6">
+              <h3 className="text-xl font-bold flex items-center gap-2 border-b border-white/5 pb-4"><Activity className="text-brand-blue"/> تدقيق جودة حملات الكورسات</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-sm">
+                  <thead className="text-slate-500 font-bold uppercase text-[10px] tracking-widest border-b border-white/5">
+                    <tr>
+                      <th className="p-4">الكورس</th>
+                      <th className="p-4">الصرف</th>
+                      <th className="p-4">الإيراد</th>
+                      <th className="p-4">الـ ROAS</th>
+                      <th className="p-4">CPL</th>
+                      <th className="p-4">معدل التحويل</th>
+                      <th className="p-4">الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {auditData.metrics.map(m => (
+                      <tr key={m.id} className="hover:bg-white/5 transition-all">
+                        <td className="p-4 font-black text-white">{m.name}</td>
+                        <td className="p-4 font-bold text-brand-blue">{m.spend}</td>
+                        <td className="p-4 font-bold text-brand-lime">{m.revenue}</td>
+                        <td className="p-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-black ${parseFloat(m.roas) >= 3 ? 'bg-brand-lime/20 text-brand-lime' : 'bg-rose-500/20 text-rose-400'}`}>
+                            {m.roas}x
+                          </span>
+                        </td>
+                        <td className="p-4 font-bold text-brand-teal">{m.cpl} ج.م</td>
+                        <td className="p-4 font-bold">{m.conversion}%</td>
+                        <td className="p-4">
+                          {parseFloat(m.roas) > 4 ? '🔥 رابحة جداً' : parseFloat(m.roas) > 2 ? '✅ مستقرة' : '⚠️ خسارة/تحتاج مراجعة'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ROAS Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+               <div className="lg:col-span-2 glass p-8 rounded-[2.5rem] border-white/5">
+                  <h3 className="text-lg font-bold mb-6">مقارنة الإيرادات بالمصاريف لكل كورس</h3>
+                  <div className="h-[350px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={auditData.metrics} barGap={12}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false}/>
+                        <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                        <Tooltip contentStyle={{backgroundColor: '#2a1b3d', border: 'none', borderRadius: '15px', color: '#fff'}} cursor={{fill: '#ffffff05'}} />
+                        <Legend verticalAlign="top" height={36}/>
+                        <Bar name="الإيرادات" dataKey="revenue" fill="#a2cf44" radius={[6, 6, 0, 0]} />
+                        <Bar name="المصاريف" dataKey="spend" fill="#258c97" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+               </div>
+               <div className="glass p-8 rounded-[2.5rem] border-white/5 space-y-6">
+                  <h3 className="text-lg font-bold">تحليل مؤشر ROAS</h3>
+                  <div className="space-y-4">
+                    {auditData.metrics.map(m => (
+                      <div key={m.id} className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span className="text-slate-400">{m.name}</span>
+                          <span className={parseFloat(m.roas) > 3 ? 'text-brand-lime' : 'text-rose-400'}>{m.roas}x</span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
+                           <div 
+                             className={`h-full transition-all duration-1000 ${parseFloat(m.roas) > 3 ? 'bg-brand-lime' : 'bg-rose-500'}`} 
+                             style={{width: `${Math.min(parseFloat(m.roas) * 10, 100)}%`}}
+                           />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-6 border-t border-white/5 space-y-4">
+                     <p className="text-[10px] text-slate-500 font-bold uppercase leading-relaxed">
+                       * ملاحظة: يتم احتساب الـ ROAS بقسمة إجمالي إيرادات المبيعات على إجمالي مصروف الحملات المستوردة خلال الفترة المحددة.
+                     </p>
+                  </div>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* META ADS VIEW */}
         {activeView === 'meta' && (
-          <div className="max-w-6xl mx-auto space-y-6">
-            <h2 className="text-3xl font-bold text-white flex items-center gap-3"><Target className="text-brand-teal"/> استيراد حملات Meta</h2>
+          <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
+            <h2 className="text-3xl font-black text-white flex items-center gap-3"><Target className="text-brand-teal"/> استيراد وتحليل تقارير Ads Manager</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="glass p-8 rounded-[2.5rem] space-y-4">
-                <h3 className="font-bold">الصق البيانات من Ads Manager</h3>
+              <div className="glass p-8 rounded-[2.5rem] space-y-4 border border-brand-teal/20">
+                <div className="flex justify-between items-center">
+                   <h3 className="font-bold flex items-center gap-2">لصق البيانات</h3>
+                   <span className="text-[10px] bg-brand-teal/20 text-brand-teal px-2 py-1 rounded-full font-bold">RAW DATA</span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  انسخ الأعمدة التالية من مدير الإعلانات: [اسم الحملة] [المبلغ المصروف] [النتائج/الليدز] [التاريخ]
+                </p>
                 <textarea 
-                  className="w-full h-64 bg-slate-900 border border-white/10 p-4 rounded-2xl outline-none text-xs text-brand-teal font-mono"
+                  className="w-full h-72 bg-slate-900/50 border border-white/10 p-4 rounded-2xl outline-none text-xs text-brand-teal font-mono transition-all focus:border-brand-teal"
                   placeholder="Campaign_Name   150.50   12   2024-10-01..."
                   value={pasteData}
                   onChange={e => setPasteData(e.target.value)}
@@ -526,71 +671,42 @@ const App: React.FC = () => {
                     });
                     setTempParsedAds(parsed);
                   }}
-                  className="w-full bg-brand-teal text-white font-bold py-4 rounded-2xl shadow-lg"
+                  className="w-full bg-brand-teal text-white font-bold py-4 rounded-2xl shadow-lg hover:scale-[1.01] transition-all"
                 >
-                  تحليل البيانات
+                  تدقيق وتحليل البيانات المنسوخة 🔍
                 </button>
               </div>
-              <div className="glass p-8 rounded-[2.5rem] flex flex-col">
-                <h3 className="font-bold mb-4">المعاينة والحفظ</h3>
-                <div className="flex-grow overflow-y-auto mb-6 bg-slate-900/50 rounded-2xl p-2 border border-white/5">
+
+              <div className="glass p-8 rounded-[2.5rem] flex flex-col border border-brand-lime/10">
+                <h3 className="font-bold mb-4 flex items-center gap-2">المعاينة قبل الحفظ <CheckCircle size={18} className="text-brand-lime"/></h3>
+                <div className="flex-grow overflow-y-auto mb-6 bg-slate-900/50 rounded-2xl p-2 border border-white/5 border-dashed">
                   <table className="w-full text-right text-[10px]">
-                    <thead className="sticky top-0 bg-slate-800 font-bold">
-                      <tr><th className="p-2">التاريخ</th><th className="p-2">الكورس</th><th className="p-2">الصرف</th><th className="p-2">الليدز</th></tr>
+                    <thead className="sticky top-0 bg-slate-800 text-slate-500 font-bold border-b border-white/5">
+                      <tr><th className="p-3">التاريخ</th><th className="p-3">الكورس</th><th className="p-3">الصرف</th><th className="p-3">الليدز</th></tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {tempParsedAds.map(a => (
-                        <tr key={a.id}>
-                          <td className="p-2">{a.date}</td>
-                          <td className="p-2 font-bold">{getCourseName(a.courseId)}</td>
-                          <td className="p-2">{a.spend}</td>
-                          <td className="p-2 text-brand-lime">{a.leads}</td>
+                        <tr key={a.id} className="hover:bg-brand-teal/5">
+                          <td className="p-3 opacity-60 font-mono">{a.date}</td>
+                          <td className="p-3 font-bold text-white">{getCourseName(a.courseId)}</td>
+                          <td className="p-3 font-black text-brand-teal">{a.spend}</td>
+                          <td className="p-3 text-brand-lime font-black">{a.leads}</td>
                         </tr>
                       ))}
+                      {tempParsedAds.length === 0 && (
+                        <tr><td colSpan={4} className="p-20 text-center text-slate-600 font-bold italic">لا توجد بيانات للمعالجة حالياً..</td></tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
                 <button 
                   disabled={tempParsedAds.length === 0}
-                  onClick={() => { setAds([...tempParsedAds, ...ads]); setTempParsedAds([]); setPasteData(''); alert('تم الاستيراد بنجاح!'); }}
-                  className="w-full bg-brand-lime text-brand-purple font-black py-4 rounded-2xl shadow-xl disabled:opacity-30"
+                  onClick={() => { setAds([...tempParsedAds, ...ads]); setTempParsedAds([]); setPasteData(''); alert('تم استيراد بيانات ميتا بنجاح! 🚀'); }}
+                  className="w-full bg-brand-lime text-brand-purple font-black py-4 rounded-2xl shadow-xl disabled:opacity-30 hover:scale-[1.01] transition-all"
                 >
-                  حفظ في قاعدة البيانات 💾
+                  تأكيد وحفظ في سجل الحملات 💾
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* VIEW: FINANCIAL ANALYTICS */}
-        {activeView === 'financial' && (
-          <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-white flex items-center gap-3"><BarChart3 className="text-brand-lime"/> التحليل المالي</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               <div className="glass p-8 rounded-3xl border-brand-teal/20">
-                  <p className="text-xs font-bold text-brand-teal mb-2 uppercase">إيرادات الكورسات</p>
-                  <p className="text-4xl font-black">{financialData.totalRevenue} <span className="text-sm font-normal">ج.م</span></p>
-               </div>
-               <div className="glass p-8 rounded-3xl border-rose-500/20">
-                  <p className="text-xs font-bold text-rose-400 mb-2 uppercase">مصاريف الإعلانات</p>
-                  <p className="text-4xl font-black">{financialData.totalSpend} <span className="text-sm font-normal">ج.م</span></p>
-               </div>
-               <div className="glass p-8 rounded-3xl border-brand-lime/20">
-                  <p className="text-xs font-bold text-brand-lime mb-2 uppercase">صافي الأرباح</p>
-                  <p className="text-4xl font-black">{financialData.totalRevenue - financialData.totalSpend} <span className="text-sm font-normal">ج.م</span></p>
-               </div>
-            </div>
-            <div className="glass p-8 rounded-[2.5rem] h-[400px]">
-               <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={financialData.metrics}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false}/>
-                    <XAxis dataKey="name" stroke="#64748b" fontSize={12}/>
-                    <YAxis stroke="#64748b" fontSize={12}/>
-                    <Tooltip contentStyle={{backgroundColor: '#2a1b3d', border: 'none', borderRadius: '15px'}}/>
-                    <Bar dataKey="revenue" fill="#a2cf44" radius={[8, 8, 0, 0]} name="الإيرادات" />
-                    <Bar dataKey="spend" fill="#258c97" radius={[8, 8, 0, 0]} name="المصاريف" />
-                  </BarChart>
-               </ResponsiveContainer>
             </div>
           </div>
         )}
@@ -598,10 +714,11 @@ const App: React.FC = () => {
 
       {/* EDIT MODAL */}
       {editingSale && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="glass w-full max-w-3xl p-8 rounded-[2.5rem] border-brand-teal/30 space-y-6 shadow-2xl">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="glass w-full max-w-3xl p-8 rounded-[2.5rem] border-brand-teal/30 space-y-6 shadow-2xl relative overflow-hidden">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-brand-teal/10 rounded-full blur-3xl -z-10"></div>
              <div className="flex justify-between items-center">
-                <h3 className="text-2xl font-bold text-white flex items-center gap-2"><Edit className="text-brand-blue"/> تعديل بيانات {editingSale.client}</h3>
+                <h3 className="text-2xl font-black text-white flex items-center gap-3"><Edit className="text-brand-blue"/> تعديل بيانات العميل <span className="text-brand-teal">#{editingSale.id.toString().slice(-4)}</span></h3>
                 <button onClick={() => setEditingSale(null)} className="text-slate-400 hover:text-white text-3xl">×</button>
              </div>
              <form onSubmit={(e) => {
@@ -633,10 +750,10 @@ const App: React.FC = () => {
                 };
                 setSales(sales.map(s => s.id === editingSale.id ? updated : s));
                 setEditingSale(null);
-                alert('تم التعديل بنجاح!');
+                alert('تم تحديث بيانات العميل بنجاح!');
              }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormGroup label="الاسم" name="client" defaultValue={editingSale.client} />
-                <FormGroup label="الموبايل" name="phone" defaultValue={editingSale.phone} />
+                <FormGroup label="الاسم الكامل" name="client" defaultValue={editingSale.client} />
+                <FormGroup label="رقم الموبايل" name="phone" defaultValue={editingSale.phone} />
                 <FormGroup label="السن" name="age" type="number" defaultValue={editingSale.age?.toString()} />
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">المحافظة</label>
@@ -644,22 +761,22 @@ const App: React.FC = () => {
                     {GOVERNORATES.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
-                <FormGroup label="المودريتور القائم بالطلب" name="modName" defaultValue={editingSale.moderatorName} />
+                <FormGroup label="المودريتور المسؤول" name="modName" defaultValue={editingSale.moderatorName} />
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">طريقة الدفع</label>
                   <select name="payMethod" defaultValue={editingSale.paymentMethod} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-sm outline-none">
                     {PAYMENT_METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
                 </div>
-                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-white/5 p-4 rounded-2xl">
-                   <FormGroup label="المدفوع" name="paid" type="number" defaultValue={editingSale.paidAmount.toString()} />
-                   <FormGroup label="الخصم" name="discount" type="number" defaultValue={editingSale.discount.toString()} />
-                   <FormGroup label="تاريخ استحقاق الباقي" name="dueDate" type="date" defaultValue={editingSale.dueDate} />
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+                   <FormGroup label="المبلغ المدفوع" name="paid" type="number" defaultValue={editingSale.paidAmount.toString()} />
+                   <FormGroup label="قيمة الخصم" name="discount" type="number" defaultValue={editingSale.discount.toString()} />
+                   <FormGroup label="موعد استحقاق الباقي" name="dueDate" type="date" defaultValue={editingSale.dueDate} />
                 </div>
                 <div className="md:col-span-2 flex gap-4 pt-4 border-t border-white/10">
-                   <button type="submit" className="flex-grow bg-brand-teal font-black text-white py-4 rounded-xl shadow-lg hover:scale-[1.01] transition-all">حفظ التغييرات</button>
+                   <button type="submit" className="flex-grow bg-brand-teal font-black text-white py-4 rounded-xl shadow-lg hover:scale-[1.01] transition-all">حفظ البيانات المحدثة</button>
                    <button type="button" onClick={() => {
-                      if(confirm('هل تريد حذف العميل نهائياً (تم السحب)؟')) {
+                      if(confirm('سيتم حذف العميل من كافة السجلات النشطة (تم السحب)، هل أنت متأكد؟')) {
                         setSales(sales.filter(x => x.id !== editingSale.id));
                         setEditingSale(null);
                       }
@@ -692,16 +809,31 @@ const DashboardCard: React.FC<{ icon: React.ReactNode, title: string, desc: stri
 );
 
 const TabBtn: React.FC<{ active: boolean, onClick: () => void, label: string }> = ({ active, onClick, label }) => (
-  <button onClick={onClick} className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${active ? 'bg-brand-teal text-white shadow-md' : 'text-slate-500 hover:text-white'}`}>
+  <button onClick={onClick} className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${active ? 'bg-brand-teal text-white shadow-md' : 'text-slate-500 hover:text-white'}`}>
     {label}
   </button>
 );
 
 const FormGroup: React.FC<{ label: string, name: string, type?: string, defaultValue?: string, required?: boolean }> = ({ label, name, type = 'text', defaultValue, required }) => (
-  <div className="space-y-1">
-    <label className="text-[10px] font-bold text-slate-500 uppercase">{label}</label>
+  <div className="space-y-1 text-right">
+    <label className="text-[10px] font-bold text-slate-500 uppercase mr-1">{label}</label>
     <input name={name} type={type} defaultValue={defaultValue} required={required} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl focus:ring-1 ring-brand-teal outline-none text-white text-sm" />
   </div>
 );
+
+const AuditMetricCard: React.FC<{ label: string, value: string, subValue: string, color: 'teal' | 'lime' | 'blue' }> = ({ label, value, subValue, color }) => {
+  const colorMap = {
+    teal: 'border-brand-teal/20 text-brand-teal',
+    lime: 'border-brand-lime/20 text-brand-lime',
+    blue: 'border-brand-blue/20 text-brand-blue'
+  };
+  return (
+    <div className={`glass p-6 rounded-3xl border ${colorMap[color]} group hover:scale-[1.02] transition-all`}>
+      <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">{label}</p>
+      <p className="text-3xl font-black text-white group-hover:text-brand-lime transition-all">{value}</p>
+      <p className="text-xs mt-2 font-bold opacity-40 italic">{subValue}</p>
+    </div>
+  );
+};
 
 export default App;

@@ -23,7 +23,8 @@ import {
   ArrowRightLeft,
   Activity,
   Zap,
-  Filter
+  Filter,
+  Save
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -74,9 +75,6 @@ const App: React.FC = () => {
     end: new Date().toISOString().split('T')[0],
     platform: 'All'
   });
-
-  const [pasteData, setPasteData] = useState('');
-  const [tempParsedAds, setTempParsedAds] = useState<AdCampaign[]>([]);
 
   // Sync to Storage
   useEffect(() => { localStorage.setItem('cp_courses', JSON.stringify(courses)); }, [courses]);
@@ -239,14 +237,14 @@ const App: React.FC = () => {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <DashboardCard icon={<Target className="text-brand-blue"/>} title="Meta Audit" desc="تحليل الحملات المستوردة" onClick={() => setActiveView('meta')} />
+              <DashboardCard icon={<Target className="text-brand-blue"/>} title="Meta Audit" desc="إدارة حملات Meta يدوياً" onClick={() => setActiveView('meta')} />
               <DashboardCard icon={<Users className="text-brand-teal"/>} title="إدارة العملاء" desc="المبيعات، التحصيل، والسحب" onClick={() => setActiveView('moderation')} />
               <DashboardCard icon={<BarChart3 className="text-brand-lime"/>} title="التحليل المالي" desc="مراقبة ROAS وتكلفة الليد" onClick={() => setActiveView('financial')} />
             </div>
           </div>
         )}
 
-        {/* SETTINGS */}
+        {/* SETTINGS (COURSES) */}
         {activeView === 'settings' && (
           <div className="max-w-4xl mx-auto space-y-6">
             <h2 className="text-3xl font-bold text-white flex items-center gap-3"><Settings className="text-brand-teal"/> إعدادات الكورسات</h2>
@@ -524,9 +522,9 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* FINANCIAL ANALYTICS (ENHANCED) */}
+        {/* FINANCIAL ANALYTICS */}
         {activeView === 'financial' && (
-          <div className="space-y-8 animate-in fade-in duration-500">
+          <div className="space-y-8 animate-in fade-in duration-500 text-right">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <h2 className="text-3xl font-black text-white flex items-center gap-3"><Zap className="text-brand-lime"/> مركز التدقيق المالي وROAS</h2>
               <div className="flex gap-3 glass p-2 rounded-2xl border-white/5 items-center">
@@ -604,7 +602,7 @@ const App: React.FC = () => {
                </div>
                <div className="glass p-8 rounded-[2.5rem] border-white/5 space-y-6">
                   <h3 className="text-lg font-bold">تحليل مؤشر ROAS</h3>
-                  <div className="space-y-4">
+                  <div className="space-y-4 text-right">
                     {auditData.metrics.map(m => (
                       <div key={m.id} className="space-y-1">
                         <div className="flex justify-between text-xs font-bold">
@@ -620,92 +618,104 @@ const App: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                  <div className="pt-6 border-t border-white/5 space-y-4">
-                     <p className="text-[10px] text-slate-500 font-bold uppercase leading-relaxed">
-                       * ملاحظة: يتم احتساب الـ ROAS بقسمة إجمالي إيرادات المبيعات على إجمالي مصروف الحملات المستوردة خلال الفترة المحددة.
-                     </p>
-                  </div>
                </div>
             </div>
           </div>
         )}
 
-        {/* META ADS VIEW */}
+        {/* META ADS VIEW (MANUAL ENTRY) */}
         {activeView === 'meta' && (
-          <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
-            <h2 className="text-3xl font-black text-white flex items-center gap-3"><Target className="text-brand-teal"/> استيراد وتحليل تقارير Ads Manager</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="glass p-8 rounded-[2.5rem] space-y-4 border border-brand-teal/20">
-                <div className="flex justify-between items-center">
-                   <h3 className="font-bold flex items-center gap-2">لصق البيانات</h3>
-                   <span className="text-[10px] bg-brand-teal/20 text-brand-teal px-2 py-1 rounded-full font-bold">RAW DATA</span>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  انسخ الأعمدة التالية من مدير الإعلانات: [اسم الحملة] [المبلغ المصروف] [النتائج/الليدز] [التاريخ]
-                </p>
-                <textarea 
-                  className="w-full h-72 bg-slate-900/50 border border-white/10 p-4 rounded-2xl outline-none text-xs text-brand-teal font-mono transition-all focus:border-brand-teal"
-                  placeholder="Campaign_Name   150.50   12   2024-10-01..."
-                  value={pasteData}
-                  onChange={e => setPasteData(e.target.value)}
-                />
-                <button 
-                  onClick={() => {
-                    const rows = pasteData.trim().split('\n');
-                    const parsed: AdCampaign[] = [];
-                    rows.forEach(r => {
-                      let cols = r.split('\t');
-                      if (cols.length < 2) cols = r.split(/\s\s+/);
-                      if (cols.length >= 2) {
-                        const name = cols[0].trim();
-                        const spend = parseFloat(cols[1]?.replace(/[^0-9.]/g, '')) || 0;
-                        const leads = parseInt(cols[2]?.replace(/[^0-9.]/g, '')) || 0;
-                        const date = cols[3]?.trim() || new Date().toISOString().split('T')[0];
-                        if (name.toLowerCase().includes('campaign') || isNaN(spend)) return;
-                        let cId = 'unknown';
-                        for (let c of courses) {
-                          if (name.toLowerCase().includes(c.name.toLowerCase())) cId = c.id;
-                        }
-                        parsed.push({ id: Date.now() + Math.random(), date, campaignName: name, courseId: cId, spend, leads, platform: 'Facebook' });
-                      }
-                    });
-                    setTempParsedAds(parsed);
-                  }}
-                  className="w-full bg-brand-teal text-white font-bold py-4 rounded-2xl shadow-lg hover:scale-[1.01] transition-all"
-                >
-                  تدقيق وتحليل البيانات المنسوخة 🔍
-                </button>
+          <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 text-right">
+            <h2 className="text-3xl font-black text-white flex items-center gap-3"><Target className="text-brand-teal"/> إدارة حملات Meta يدوياً</h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+              {/* Manual Entry Form */}
+              <div className="glass p-8 rounded-[2.5rem] border border-brand-teal/20 space-y-6">
+                <h3 className="text-xl font-bold flex items-center gap-2 border-b border-white/5 pb-4"><Plus className="text-brand-teal"/> إضافة سجل حملة جديد</h3>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  const data = new FormData(form);
+                  const newCampaign: AdCampaign = {
+                    id: Date.now(),
+                    date: data.get('date') as string,
+                    campaignName: data.get('name') as string,
+                    courseId: data.get('courseId') as string,
+                    spend: parseFloat(data.get('spend') as string) || 0,
+                    leads: parseInt(data.get('leads') as string) || 0,
+                    platform: 'Facebook'
+                  };
+                  setAds([newCampaign, ...ads]);
+                  form.reset();
+                  alert('تم حفظ بيانات الحملة بنجاح! ✅');
+                }} className="space-y-4">
+                  <FormGroup label="اسم الحملة الإعلانية" name="name" required placeholder="مثلاً: FB-Content-Oct" />
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase mr-1">الكورس المرتبط</label>
+                    <select name="courseId" className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl outline-none text-sm font-bold text-white">
+                      {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormGroup label="المبلغ المصروف" name="spend" type="number" required placeholder="0.00" />
+                    <FormGroup label="عدد النتائج (Leads)" name="leads" type="number" required placeholder="0" />
+                  </div>
+                  <FormGroup label="تاريخ التقرير" name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} required />
+                  <button type="submit" className="w-full bg-brand-teal text-white font-black py-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 hover:scale-[1.01] transition-all">
+                    <Save size={18}/> حفظ في السجلات
+                  </button>
+                </form>
               </div>
 
-              <div className="glass p-8 rounded-[2.5rem] flex flex-col border border-brand-lime/10">
-                <h3 className="font-bold mb-4 flex items-center gap-2">المعاينة قبل الحفظ <CheckCircle size={18} className="text-brand-lime"/></h3>
-                <div className="flex-grow overflow-y-auto mb-6 bg-slate-900/50 rounded-2xl p-2 border border-white/5 border-dashed">
-                  <table className="w-full text-right text-[10px]">
-                    <thead className="sticky top-0 bg-slate-800 text-slate-500 font-bold border-b border-white/5">
-                      <tr><th className="p-3">التاريخ</th><th className="p-3">الكورس</th><th className="p-3">الصرف</th><th className="p-3">الليدز</th></tr>
+              {/* History Table */}
+              <div className="lg:col-span-2 glass p-8 rounded-[2.5rem] border border-white/5 space-y-4">
+                <div className="flex justify-between items-center mb-4">
+                   <h3 className="text-xl font-bold">سجل الحملات المدخلة</h3>
+                   <span className="text-[10px] bg-slate-900 text-slate-500 px-3 py-1 rounded-full font-bold">{ads.length} سجل</span>
+                </div>
+                <div className="overflow-x-auto max-h-[600px]">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-slate-900 text-slate-400 font-bold sticky top-0">
+                      <tr>
+                        <th className="p-4">التاريخ</th>
+                        <th className="p-4">الحملة / الكورس</th>
+                        <th className="p-4">المصروف</th>
+                        <th className="p-4">الليدز</th>
+                        <th className="p-4">CPL</th>
+                        <th className="p-4">إجراء</th>
+                      </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {tempParsedAds.map(a => (
-                        <tr key={a.id} className="hover:bg-brand-teal/5">
-                          <td className="p-3 opacity-60 font-mono">{a.date}</td>
-                          <td className="p-3 font-bold text-white">{getCourseName(a.courseId)}</td>
-                          <td className="p-3 font-black text-brand-teal">{a.spend}</td>
-                          <td className="p-3 text-brand-lime font-black">{a.leads}</td>
+                      {ads.map(a => (
+                        <tr key={a.id} className="hover:bg-white/5 transition-colors">
+                          <td className="p-4 opacity-70 font-mono">{a.date}</td>
+                          <td className="p-4">
+                            <div className="font-bold text-white text-sm">{a.campaignName}</div>
+                            <div className="text-[10px] text-brand-teal font-bold">{getCourseName(a.courseId)}</div>
+                          </td>
+                          <td className="p-4 font-black text-brand-blue">{a.spend} ج.م</td>
+                          <td className="p-4 font-black text-brand-lime">{a.leads}</td>
+                          <td className="p-4 font-bold text-slate-400">
+                             {a.leads > 0 ? (a.spend / a.leads).toFixed(2) : '0.00'} ج.م
+                          </td>
+                          <td className="p-4">
+                            <button 
+                              onClick={() => { if(confirm('هل تريد حذف هذا السجل؟')) setAds(ads.filter(x => x.id !== a.id)); }} 
+                              className="p-2 bg-rose-500/10 text-rose-400 rounded-lg hover:bg-rose-500 hover:text-white transition-all"
+                            >
+                              <Trash2 size={16}/>
+                            </button>
+                          </td>
                         </tr>
                       ))}
-                      {tempParsedAds.length === 0 && (
-                        <tr><td colSpan={4} className="p-20 text-center text-slate-600 font-bold italic">لا توجد بيانات للمعالجة حالياً..</td></tr>
+                      {ads.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="p-20 text-center text-slate-600 font-bold italic">لا توجد حملات مسجلة بعد.. ابدأ بإضافة أول حملة!</td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
-                <button 
-                  disabled={tempParsedAds.length === 0}
-                  onClick={() => { setAds([...tempParsedAds, ...ads]); setTempParsedAds([]); setPasteData(''); alert('تم استيراد بيانات ميتا بنجاح! 🚀'); }}
-                  className="w-full bg-brand-lime text-brand-purple font-black py-4 rounded-2xl shadow-xl disabled:opacity-30 hover:scale-[1.01] transition-all"
-                >
-                  تأكيد وحفظ في سجل الحملات 💾
-                </button>
               </div>
             </div>
           </div>
@@ -715,7 +725,7 @@ const App: React.FC = () => {
       {/* EDIT MODAL */}
       {editingSale && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="glass w-full max-w-3xl p-8 rounded-[2.5rem] border-brand-teal/30 space-y-6 shadow-2xl relative overflow-hidden">
+          <div className="glass w-full max-w-3xl p-8 rounded-[2.5rem] border-brand-teal/30 space-y-6 shadow-2xl relative overflow-hidden text-right">
              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-teal/10 rounded-full blur-3xl -z-10"></div>
              <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-black text-white flex items-center gap-3"><Edit className="text-brand-blue"/> تعديل بيانات العميل <span className="text-brand-teal">#{editingSale.id.toString().slice(-4)}</span></h3>
@@ -751,20 +761,20 @@ const App: React.FC = () => {
                 setSales(sales.map(s => s.id === editingSale.id ? updated : s));
                 setEditingSale(null);
                 alert('تم تحديث بيانات العميل بنجاح!');
-             }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             }} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-right">
                 <FormGroup label="الاسم الكامل" name="client" defaultValue={editingSale.client} />
                 <FormGroup label="رقم الموبايل" name="phone" defaultValue={editingSale.phone} />
                 <FormGroup label="السن" name="age" type="number" defaultValue={editingSale.age?.toString()} />
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">المحافظة</label>
-                  <select name="gov" defaultValue={editingSale.governorate} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-sm outline-none">
+                  <select name="gov" defaultValue={editingSale.governorate} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-sm outline-none text-white">
                     {GOVERNORATES.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
                 <FormGroup label="المودريتور المسؤول" name="modName" defaultValue={editingSale.moderatorName} />
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">طريقة الدفع</label>
-                  <select name="payMethod" defaultValue={editingSale.paymentMethod} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-sm outline-none">
+                  <select name="payMethod" defaultValue={editingSale.paymentMethod} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-sm outline-none text-white">
                     {PAYMENT_METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
                 </div>
@@ -814,10 +824,10 @@ const TabBtn: React.FC<{ active: boolean, onClick: () => void, label: string }> 
   </button>
 );
 
-const FormGroup: React.FC<{ label: string, name: string, type?: string, defaultValue?: string, required?: boolean }> = ({ label, name, type = 'text', defaultValue, required }) => (
+const FormGroup: React.FC<{ label: string, name: string, type?: string, defaultValue?: string, required?: boolean, placeholder?: string }> = ({ label, name, type = 'text', defaultValue, required, placeholder }) => (
   <div className="space-y-1 text-right">
     <label className="text-[10px] font-bold text-slate-500 uppercase mr-1">{label}</label>
-    <input name={name} type={type} defaultValue={defaultValue} required={required} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl focus:ring-1 ring-brand-teal outline-none text-white text-sm" />
+    <input name={name} type={type} defaultValue={defaultValue} required={required} placeholder={placeholder} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl focus:ring-1 ring-brand-teal outline-none text-white text-sm" />
   </div>
 );
 
@@ -828,7 +838,7 @@ const AuditMetricCard: React.FC<{ label: string, value: string, subValue: string
     blue: 'border-brand-blue/20 text-brand-blue'
   };
   return (
-    <div className={`glass p-6 rounded-3xl border ${colorMap[color]} group hover:scale-[1.02] transition-all`}>
+    <div className={`glass p-6 rounded-3xl border ${colorMap[color]} group hover:scale-[1.02] transition-all text-right`}>
       <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">{label}</p>
       <p className="text-3xl font-black text-white group-hover:text-brand-lime transition-all">{value}</p>
       <p className="text-xs mt-2 font-bold opacity-40 italic">{subValue}</p>
